@@ -1,0 +1,128 @@
+修改hostname
+# cat /etc/hostname 
+kolla
+
+关闭防火墙
+#service firewalld stop && chkconfig firewalld off
+
+修改selinux修改成disabled状态，SELINUX=disabled
+ #cat /etc/selinux/config
+
+需要两张网卡，一张绑定了IP地址，这个地址需要连接互联网，另一张网卡不绑定IP地址，如下是我的实验环境：
+#ifconfig
+enp0s3: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 192.168.1.118  netmask 255.255.255.0  broadcast 192.168.1.255
+        inet6 fe80::a00:27ff:fec1:5c8c  prefixlen 64  scopeid 0x20<link>
+        ether 08:00:27:c1:5c:8c  txqueuelen 1000  (Ethernet)
+        RX packets 208814  bytes 303422961 (289.3 MiB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 70480  bytes 5800805 (5.5 MiB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+enp0s8: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        ether 08:00:27:1d:df:aa  txqueuelen 1000  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+        inet 127.0.0.1  netmask 255.0.0.0
+        inet6 ::1  prefixlen 128  scopeid 0x10<host>
+        loop  txqueuelen 0  (Local Loopback)
+        RX packets 6  bytes 504 (504.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 6  bytes 504 (504.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+将hostname解析加入/etc/hosts文件中
+# cat /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.1.118 kolla
+
+安装依赖包：
+#yum install -y epel-release python-pip 
+#pip install --upgrade pip
+#yum install -y python-devel libffi-devel openssl-devel gcc vim git python-setuptools wget
+
+安装ansible1.9.6
+#yum install ansible1.9.noarch -y
+
+安装docker：
+#curl -sSL https://get.docker.io | bash
+安装完成后使用#docker version查看docker版本
+
+修改docker启动文件
+#mkdir -p /etc/systemd/system/docker.service.d
+#tee /etc/systemd/system/docker.service.d/kolla.conf <<-'EOF'
+[Service]
+MountFlags=shared
+EOF
+
+加载配置文件设置自启，并启动docker服务：
+#systemctl daemon-reload && systemctl enable docker && systemctl start docker
+
+安装kolla：
+#pip install kolla/ 
+
+#cd kolla/
+
+安装tox：
+#pip install -U tox
+
+安装openstackclient跟neutronclient
+#pip install -U python-openstackclient python-neutronclient
+
+安装依赖
+#pip install -r requirements.txt -r test-requirements.txt
+
+生成kolla-build.conf配置文件：
+#tox -e genconfig
+
+复制配置文件到/etc目录下
+#cp -rv etc/kolla /etc/
+
+编译centos镜像，更多参数请参考http://docs.openstack.org/developer/kolla/image-building.html
+#kolla-build --base centos --type source -p default
+如果个别镜像编译失败可以重新执行以上操作，因为docker的容器缓存，重新编译会很快。
+这个过程比较漫长，可以去泡一壶茶，或者现磨一杯咖啡，已用来消磨漫长的等待时间。
+
+
+build完成后执行命令查看docker 镜像
+#docker images
+
+
+部署容器
+#vim /etc/kolla/passwords.yml
+kolla_install_type: "source"
+kolla_internal_address: "192.168.1.222" #这个IP要跟端口同一个网段并且未被使用
+network_interface: "enp0s3"
+neutron_external_interface: "enp0s8"
+
+kolla-genpwd
+#生成密码，也可以自己去配置
+
+#kolla-ansible prechecks
+#检查端口，IP，ansible等配置
+
+#kolla-ansible deploy #开始部署容器
+部署成功后查看容器
+#docker ps
+
+#kolla-ansible post-deploy
+
+#cat /etc/kolla/admin-openrc.sh 
+查看dashboard的登录信息
+
+#sourch /etc/kolla/admin-openrc.sh
+初始化环境变量
+
+#kolla/tools/init-runonce
+初始化一个镜像跟网络
+
+访问地址http://192.168.1.118/auth/login
+域是default
+用户admin
+密码是/etc/kolla/nova-compute中对应的keystone_admin_password字段的值。
+
