@@ -135,3 +135,28 @@ neutron_external_interface: "enp0s8"
 用户admin
 密码是/etc/kolla/nova-compute中对应的keystone_admin_password字段的值。
 
+
+
+
+一些有用的工具
+1.  部署完成后，运行以下命令可以生成一个openrc文件(运行openstack CLI所需的环境变量):
+
+kolla-ansible post-deploy
+2.  openrc文件生成之后，使用以下命令可以帮你做一下openstack的初始化工作，包括上传一个glance镜像以及创建几个虚拟网络:
+
+source /etc/kolla/admin-openrc.sh
+kolla/tools/init-runonce
+3.  由于错误的出现，可能需要多次的部署，而有些错误重新部署是不会进行修正的，所以需要将整个环境进行清理:
+
+tools/cleanup-containers                #可用于从系统中移除部署的容器
+tools/cleanup-host                      #可用于移除由于残余网络变化引发的docker启动的neutron-agents主机
+tools/cleanup-images                    #可用于从本地缓存中移除所有的docker image
+日志查看
+kolla通过heka容器来收集所有容器的日志
+
+docker exec -it heka bash
+所有的容器都可以从这个目录中获取服务日志：/var/log/kolla/SERVICE_NAME。
+如果需要输出日志，请运行：
+
+docker logs
+大多数容器不会stdout，上面的命令将不会提供信息。
