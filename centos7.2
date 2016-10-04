@@ -64,7 +64,13 @@ EOF
 加载配置文件设置自启，并启动docker服务：
 #systemctl daemon-reload && systemctl enable docker && systemctl start docker
 
+下载kolla源码
+#git clone https://git.openstack.org/openstack/kolla
+#cd kolla/
+#git checkout stable/mitaka
+
 安装kolla：
+#cd ~
 #pip install kolla/ 
 
 #cd kolla/
